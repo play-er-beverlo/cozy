@@ -23,28 +23,42 @@ const client = useSupabaseClient()
 const sorting = ref([{ id: 'name', desc: false }])
 const UButton = resolveComponent('UButton')
 
-const { data: playersData, pending: playersPending, error: playersError } = await useAsyncData('players', async () => {
-  const { data, error } = await client
-    .from('players')
-    .select('id,name,rating')
+const { data: playersData, pending: playersPending, error: playersError } = await useAsyncData(
+  'players',
+  async () => {
+    const { data, error } = await client
+      .from('players')
+      .select('id,name,rating')
 
-  if (error) {
-    throw error
+    if (error) {
+      throw error
+    }
+    return data as Player[]
+  },
+  {
+    // The homepage is prerendered, so fetch fresh data in the browser.
+    server: false
   }
-  return data as Player[]
-})
+)
 
-const { data: tournamentsData, pending: tournamentsPending, error: tournamentsError } = await useAsyncData('tournaments', async () => {
-  const { data, error } = await client
-    .from('tournaments')
-    .select('id,event_date,winner_player_id,loser_player_id,winner_rating_before,winner_rating_after,loser_rating_before,loser_rating_after')
-    .order('event_date', { ascending: false })
+const { data: tournamentsData, pending: tournamentsPending, error: tournamentsError } = await useAsyncData(
+  'tournaments',
+  async () => {
+    const { data, error } = await client
+      .from('tournaments')
+      .select('id,event_date,winner_player_id,loser_player_id,winner_rating_before,winner_rating_after,loser_rating_before,loser_rating_after')
+      .order('event_date', { ascending: false })
 
-  if (error) {
-    throw error
+    if (error) {
+      throw error
+    }
+    return data as TournamentRow[]
+  },
+  {
+    // Keep tournament history in sync for prerendered `/` too.
+    server: false
   }
-  return data as TournamentRow[]
-})
+)
 
 const players = computed(() => playersData.value ?? [])
 const tournaments = computed(() => tournamentsData.value ?? [])
@@ -84,7 +98,6 @@ const playerColumns: TableColumn<Player>[] = [
     header: ({ column }) => getSortableHeader(column, 'Niveau')
   }
 ]
-
 </script>
 
 <template>
@@ -128,7 +141,10 @@ const playerColumns: TableColumn<Player>[] = [
         <div v-else-if="!tournaments.length">
           Er zijn nog geen tornooiresultaten geregistreerd.
         </div>
-        <div v-else class="overflow-auto">
+        <div
+          v-else
+          class="overflow-auto"
+        >
           <table class="w-full">
             <thead>
               <tr class="border-b">
@@ -150,7 +166,11 @@ const playerColumns: TableColumn<Player>[] = [
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in tournaments" :key="row.id" class="border-b last:border-b-0">
+              <tr
+                v-for="row in tournaments"
+                :key="row.id"
+                class="border-b last:border-b-0"
+              >
                 <td class="py-2">
                   {{ formatDate(row.event_date) }}
                 </td>
