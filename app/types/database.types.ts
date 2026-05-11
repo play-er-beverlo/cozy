@@ -90,6 +90,12 @@ export interface Database {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      delete_tournament_result: {
+        Args: {
+          p_tournament_id: string
+        }
+        Returns: Database['public']['Tables']['tournaments']['Row']
+      }
       record_tournament_result: {
         Args: {
           p_event_date: string

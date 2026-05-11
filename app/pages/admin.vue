@@ -9,6 +9,18 @@ type Player = {
   rating: number
 }
 
+type TournamentRow = {
+  id: string
+  event_date: string
+  winner_player_id: string
+  loser_player_id: string
+  winner_rating_before: number
+  winner_rating_after: number
+  loser_rating_before: number
+  loser_rating_after: number
+  created_at: string
+}
+
 const client = useSupabaseClient()
 
 const { data: playersData, pending, error, refresh } = await useAsyncData('admin-players', async () => {
@@ -24,7 +36,23 @@ const { data: playersData, pending, error, refresh } = await useAsyncData('admin
   return data as Player[]
 })
 
+const { data: tournamentsData, pending: tournamentsPending, error: tournamentsError, refresh: refreshTournaments } = await useAsyncData('admin-tournaments', async () => {
+  const { data, error } = await client
+    .from('tournaments')
+    .select('id,event_date,winner_player_id,loser_player_id,winner_rating_before,winner_rating_after,loser_rating_before,loser_rating_after,created_at')
+    .order('event_date', { ascending: false })
+
+  if (error) {
+    throw error
+  }
+
+  return data as TournamentRow[]
+})
+
 const players = computed(() => playersData.value ?? [])
+const tournaments = computed(() => tournamentsData.value ?? [])
+const latestTournamentId = computed(() => tournaments.value[0]?.id ?? null)
+const playerMap = computed(() => new Map(players.value.map(player => [player.id, player.name])))
 const playerName = ref('')
 const playerRating = ref(1)
 
@@ -38,6 +66,9 @@ const loserId = ref('')
 const savingTournament = ref(false)
 const tournamentMessage = ref('')
 const tournamentError = ref('')
+const deletingTournamentId = ref<string | null>(null)
+const tournamentManageMessage = ref('')
+const tournamentManageError = ref('')
 
 async function addPlayer() {
   savingPlayer.value = true
@@ -121,7 +152,27 @@ async function recordTournament() {
   tournamentMessage.value = 'Tornooiresultaat opgeslagen en niveaus bijgewerkt.'
   winnerId.value = ''
   loserId.value = ''
-  await refresh()
+  await Promise.all([refresh(), refreshTournaments()])
+}
+
+async function deleteTournamentResult(tournamentId: string) {
+  deletingTournamentId.value = tournamentId
+  tournamentManageMessage.value = ''
+  tournamentManageError.value = ''
+
+  const { error } = await client.rpc('delete_tournament_result', {
+    p_tournament_id: tournamentId
+  })
+
+  deletingTournamentId.value = null
+
+  if (error) {
+    tournamentManageError.value = error.message
+    return
+  }
+
+  tournamentManageMessage.value = 'Tornooiresultaat verwijderd en niveaus teruggezet.'
+  await Promise.all([refresh(), refreshTournaments()])
 }
 </script>
 
@@ -176,6 +227,69 @@ async function recordTournament() {
       </p>
       <p v-if="tournamentError" class="text-sm text-red-600 mt-3">
         {{ tournamentError }}
+      </p>
+    </UCard>
+
+    <UCard>
+      <template #header>
+        <h2 class="text-lg font-semibold">
+          Tornooiresultaten beheren
+        </h2>
+      </template>
+
+      <p class="text-sm text-muted pb-3">
+        Om niveaus consistent te houden kan enkel het meest recente tornooiresultaat verwijderd worden.
+      </p>
+
+      <div v-if="tournamentsPending">
+        Tornooiresultaten laden...
+      </div>
+      <div v-else-if="tournamentsError">
+        Laden van tornooiresultaten mislukt: {{ tournamentsError.message }}
+      </div>
+      <div v-else-if="!tournaments.length">
+        Er zijn nog geen tornooiresultaten geregistreerd.
+      </div>
+      <div v-else class="space-y-3">
+        <div
+          v-for="row in tournaments"
+          :key="row.id"
+          class="grid md:grid-cols-[130px_1fr_1fr_1fr_auto] gap-2 items-end border-b pb-3"
+        >
+          <div class="text-sm">
+            <p class="font-medium">
+              {{ row.event_date }}
+            </p>
+          </div>
+          <div class="text-sm">
+            <p><span class="font-medium">Winnaar:</span> {{ playerMap.get(row.winner_player_id) ?? 'Onbekend' }}</p>
+            <p>Niveau: {{ row.winner_rating_before }} -> {{ row.winner_rating_after }}</p>
+          </div>
+          <div class="text-sm">
+            <p><span class="font-medium">Verliezer:</span> {{ playerMap.get(row.loser_player_id) ?? 'Onbekend' }}</p>
+            <p>Niveau: {{ row.loser_rating_before }} -> {{ row.loser_rating_after }}</p>
+          </div>
+          <div class="text-sm text-muted">
+            <p v-if="row.id === latestTournamentId">
+              Meest recent
+            </p>
+          </div>
+          <UButton
+            color="error"
+            variant="outline"
+            label="Verwijderen"
+            :disabled="row.id !== latestTournamentId"
+            :loading="deletingTournamentId === row.id"
+            @click="deleteTournamentResult(row.id)"
+          />
+        </div>
+      </div>
+
+      <p v-if="tournamentManageMessage" class="text-sm text-green-600 mt-3">
+        {{ tournamentManageMessage }}
+      </p>
+      <p v-if="tournamentManageError" class="text-sm text-red-600 mt-3">
+        {{ tournamentManageError }}
       </p>
     </UCard>
 

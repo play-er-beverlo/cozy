@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { h, resolveComponent } from 'vue'
+import type { TableColumn } from '@nuxt/ui'
+
 type Player = {
   id: string
   name: string
@@ -17,7 +20,8 @@ type TournamentRow = {
 }
 
 const client = useSupabaseClient()
-const sorting = ref([{ id: 'rating', desc: true }])
+const sorting = ref([{ id: 'name', desc: false }])
+const UButton = resolveComponent('UButton')
 
 const { data: playersData, pending: playersPending, error: playersError } = await useAsyncData('players', async () => {
   const { data, error } = await client
@@ -45,14 +49,30 @@ const { data: tournamentsData, pending: tournamentsPending, error: tournamentsEr
 const players = computed(() => playersData.value ?? [])
 const tournaments = computed(() => tournamentsData.value ?? [])
 const playerMap = computed(() => new Map(players.value.map(player => [player.id, player.name])))
-const playerColumns = [
+function getSortableHeader(column: { getIsSorted: () => false | 'asc' | 'desc', toggleSorting: (desc?: boolean) => void }, label: string) {
+  const isSorted = column.getIsSorted()
+  return h(UButton, {
+    color: 'neutral',
+    variant: 'ghost',
+    label,
+    icon: isSorted
+      ? isSorted === 'asc'
+        ? 'i-lucide-arrow-up-narrow-wide'
+        : 'i-lucide-arrow-down-wide-narrow'
+      : 'i-lucide-arrow-up-down',
+    class: '-mx-2.5',
+    onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+  })
+}
+
+const playerColumns: TableColumn<Player>[] = [
   {
     accessorKey: 'name',
-    header: 'Naam'
+    header: ({ column }) => getSortableHeader(column, 'Naam')
   },
   {
     accessorKey: 'rating',
-    header: 'Niveau'
+    header: ({ column }) => getSortableHeader(column, 'Niveau')
   }
 ]
 
