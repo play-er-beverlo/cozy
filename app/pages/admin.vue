@@ -53,6 +53,15 @@ const players = computed(() => playersData.value ?? [])
 const tournaments = computed(() => tournamentsData.value ?? [])
 const latestTournamentId = computed(() => tournaments.value[0]?.id ?? null)
 const playerMap = computed(() => new Map(players.value.map(player => [player.id, player.name])))
+
+function formatDate(dateString: string) {
+  return new Date(`${dateString}T00:00:00`).toLocaleDateString('nl-BE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  })
+}
+
 const playerName = ref('')
 const playerRating = ref(1)
 
@@ -258,7 +267,7 @@ async function deleteTournamentResult(tournamentId: string) {
         >
           <div class="text-sm">
             <p class="font-medium">
-              {{ row.event_date }}
+              {{ formatDate(row.event_date) }}
             </p>
           </div>
           <div class="text-sm">

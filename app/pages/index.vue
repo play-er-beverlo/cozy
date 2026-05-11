@@ -49,6 +49,15 @@ const { data: tournamentsData, pending: tournamentsPending, error: tournamentsEr
 const players = computed(() => playersData.value ?? [])
 const tournaments = computed(() => tournamentsData.value ?? [])
 const playerMap = computed(() => new Map(players.value.map(player => [player.id, player.name])))
+
+function formatDate(dateString: string) {
+  return new Date(`${dateString}T00:00:00`).toLocaleDateString('nl-BE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  })
+}
+
 function getSortableHeader(column: { getIsSorted: () => false | 'asc' | 'desc', toggleSorting: (desc?: boolean) => void }, label: string) {
   const isSorted = column.getIsSorted()
   return h(UButton, {
@@ -143,7 +152,7 @@ const playerColumns: TableColumn<Player>[] = [
             <tbody>
               <tr v-for="row in tournaments" :key="row.id" class="border-b last:border-b-0">
                 <td class="py-2">
-                  {{ row.event_date }}
+                  {{ formatDate(row.event_date) }}
                 </td>
                 <td class="py-2">
                   {{ playerMap.get(row.winner_player_id) ?? 'Onbekend' }}
