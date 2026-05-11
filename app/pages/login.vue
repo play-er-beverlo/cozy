@@ -43,7 +43,7 @@ async function signIn() {
   const { error } = await client.auth.signInWithOtp({
     email: email.value,
     options: {
-      emailRedirectTo: window.location.origin + '/login?redirect=/admin'
+      emailRedirectTo: new URL('/login?redirect=/admin', window.location.origin).toString()
     }
   })
 

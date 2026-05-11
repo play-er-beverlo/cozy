@@ -21,7 +21,13 @@ type TournamentRow = {
   created_at: string
 }
 
+type AdminEmailRow = {
+  email: string
+  created_at: string
+}
+
 const client = useSupabaseClient()
+const user = useSupabaseUser()
 
 const { data: playersData, pending, error, refresh } = await useAsyncData('admin-players', async () => {
   const { data, error } = await client
@@ -49,8 +55,23 @@ const { data: tournamentsData, pending: tournamentsPending, error: tournamentsEr
   return data as TournamentRow[]
 })
 
+const { data: adminEmailsData, pending: adminEmailsPending, error: adminEmailsError, refresh: refreshAdminEmails } = await useAsyncData('admin-emails', async () => {
+  const { data, error } = await client
+    .from('admin_emails')
+    .select('email,created_at')
+    .order('email', { ascending: true })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminEmailRow[]
+})
+
 const players = computed(() => playersData.value ?? [])
 const tournaments = computed(() => tournamentsData.value ?? [])
+const adminEmails = computed(() => adminEmailsData.value ?? [])
+const currentUserEmail = computed(() => user.value?.email?.toLowerCase() ?? '')
 const latestTournamentId = computed(() => tournaments.value[0]?.id ?? null)
 const playerMap = computed(() => new Map(players.value.map(player => [player.id, player.name])))
 
@@ -78,6 +99,11 @@ const tournamentError = ref('')
 const deletingTournamentId = ref<string | null>(null)
 const tournamentManageMessage = ref('')
 const tournamentManageError = ref('')
+const newAdminEmail = ref('')
+const savingAdminEmail = ref(false)
+const deletingAdminEmail = ref<string | null>(null)
+const adminEmailMessage = ref('')
+const adminEmailError = ref('')
 
 async function addPlayer() {
   savingPlayer.value = true
@@ -182,6 +208,59 @@ async function deleteTournamentResult(tournamentId: string) {
 
   tournamentManageMessage.value = 'Tornooiresultaat verwijderd en niveaus teruggezet.'
   await Promise.all([refresh(), refreshTournaments()])
+}
+
+async function addAdminEmail() {
+  savingAdminEmail.value = true
+  adminEmailMessage.value = ''
+  adminEmailError.value = ''
+
+  const email = newAdminEmail.value.trim().toLowerCase()
+  const { error } = await client
+    .from('admin_emails')
+    .insert({ email })
+
+  savingAdminEmail.value = false
+
+  if (error) {
+    adminEmailError.value = error.message
+    return
+  }
+
+  adminEmailMessage.value = 'Beheerder toegevoegd.'
+  newAdminEmail.value = ''
+  await refreshAdminEmails()
+}
+
+async function deleteAdminEmail(email: string) {
+  if (email.toLowerCase() === currentUserEmail.value) {
+    adminEmailError.value = 'Je kan jezelf niet als beheerder verwijderen.'
+    return
+  }
+
+  if (adminEmails.value.length <= 1) {
+    adminEmailError.value = 'Er moet minstens één beheerder overblijven.'
+    return
+  }
+
+  deletingAdminEmail.value = email
+  adminEmailMessage.value = ''
+  adminEmailError.value = ''
+
+  const { error } = await client
+    .from('admin_emails')
+    .delete()
+    .eq('email', email)
+
+  deletingAdminEmail.value = null
+
+  if (error) {
+    adminEmailError.value = error.message
+    return
+  }
+
+  adminEmailMessage.value = 'Beheerder verwijderd.'
+  await refreshAdminEmails()
 }
 </script>
 
@@ -362,6 +441,54 @@ async function deleteTournamentResult(tournamentId: string) {
           <UButton color="error" variant="outline" label="Verwijderen" @click="deletePlayer(player.id)" />
         </div>
       </div>
+    </UCard>
+
+    <UCard>
+      <template #header>
+        <h2 class="text-lg font-semibold">
+          Beheerder e-mails
+        </h2>
+      </template>
+
+      <form class="grid md:grid-cols-[1fr_auto] gap-3 items-end" @submit.prevent="addAdminEmail">
+        <div class="space-y-1">
+          <label for="admin-email" class="text-sm font-medium">E-mailadres beheerder</label>
+          <input id="admin-email" v-model="newAdminEmail" type="email" required class="w-full border rounded px-3 py-2 bg-transparent">
+        </div>
+        <UButton type="submit" :loading="savingAdminEmail" label="Beheerder toevoegen" />
+      </form>
+
+      <div v-if="adminEmailsPending" class="mt-4">
+        Beheerders laden...
+      </div>
+      <div v-else-if="adminEmailsError" class="mt-4">
+        Laden van beheerders mislukt: {{ adminEmailsError.message }}
+      </div>
+      <div v-else-if="!adminEmails.length" class="mt-4">
+        Geen beheerders gevonden.
+      </div>
+      <div v-else class="space-y-3 mt-4">
+        <div v-for="admin in adminEmails" :key="admin.email" class="grid md:grid-cols-[1fr_auto] gap-2 items-center border-b pb-3">
+          <p class="text-sm">
+            {{ admin.email }}
+          </p>
+          <UButton
+            color="error"
+            variant="outline"
+            label="Verwijderen"
+            :disabled="adminEmails.length <= 1 || admin.email.toLowerCase() === currentUserEmail"
+            :loading="deletingAdminEmail === admin.email"
+            @click="deleteAdminEmail(admin.email)"
+          />
+        </div>
+      </div>
+
+      <p v-if="adminEmailMessage" class="text-sm text-green-600 mt-3">
+        {{ adminEmailMessage }}
+      </p>
+      <p v-if="adminEmailError" class="text-sm text-red-600 mt-3">
+        {{ adminEmailError }}
+      </p>
     </UCard>
 
   </UContainer>
