@@ -1,64 +1,65 @@
-# Nuxt Starter Template
+# Snooker Club Evening App
 
-[![Nuxt UI](https://img.shields.io/badge/Made%20with-Nuxt%20UI-00DC82?logo=nuxt&labelColor=020420)](https://ui.nuxt.com)
+Nuxt 4 + Nuxt UI app for:
+- Public leaderboard (sortable by name/rating)
+- Handicap preview (`5` points per rating difference)
+- Public tournament history
+- Admin-only player management and tournament result recording
 
-Use this template to get started with [Nuxt UI](https://ui.nuxt.com) quickly.
+## Stack
 
-- [Live demo](https://starter-template.nuxt.dev/)
-- [Documentation](https://ui.nuxt.com/docs/getting-started/installation/nuxt)
+- Nuxt 4
+- Nuxt UI
+- Supabase (`@nuxtjs/supabase`)
 
-<a href="https://starter-template.nuxt.dev/" target="_blank">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://ui.nuxt.com/assets/templates/nuxt/starter-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="https://ui.nuxt.com/assets/templates/nuxt/starter-light.png">
-    <img alt="Nuxt Starter Template" src="https://ui.nuxt.com/assets/templates/nuxt/starter-light.png" width="830" height="466">
-  </picture>
-</a>
+## Environment
 
-> The starter template for Vue is on https://github.com/nuxt-ui-templates/starter-vue.
+Copy `.env.example` to `.env` and set:
 
-## Quick Start
-
-```bash [Terminal]
-npm create nuxt@latest -- -t ui
+```bash
+NUXT_PUBLIC_SUPABASE_URL=...
+NUXT_PUBLIC_SUPABASE_KEY=...
 ```
 
-## Deploy your own
+## Database setup (Supabase SQL)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-name=starter&repository-url=https%3A%2F%2Fgithub.com%2Fnuxt-ui-templates%2Fstarter&demo-image=https%3A%2F%2Fui.nuxt.com%2Fassets%2Ftemplates%2Fnuxt%2Fstarter-dark.png&demo-url=https%3A%2F%2Fstarter-template.nuxt.dev%2F&demo-title=Nuxt%20Starter%20Template&demo-description=A%20minimal%20template%20to%20get%20started%20with%20Nuxt%20UI.)
+Run the migration in:
 
-## Setup
+`supabase/migrations/20260510213000_snooker_schema.sql`
 
-Make sure to install the dependencies:
+What it creates:
+- `players` table with rating range check (`1..10`)
+- `tournaments` table with one result per date and winner/loser constraints
+- `admin_emails` allowlist table
+- `is_admin()` function
+- `record_tournament_result(...)` RPC to atomically:
+  - read current ratings
+  - apply `+1/-1` with clamping
+  - update players
+  - insert tournament history row
+- RLS policies:
+  - public `SELECT` on players/tournaments
+  - admin-only writes
+
+### Add an admin
+
+Insert admin emails into `admin_emails`:
+
+```sql
+insert into public.admin_emails (email) values ('admin@example.com');
+```
+
+## Run
 
 ```bash
 pnpm install
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
-
-```bash
 pnpm dev
 ```
 
-## Production
-
-Build the application for production:
+## Verify
 
 ```bash
-pnpm build
+pnpm lint
+pnpm typecheck
+pnpm test
 ```
-
-Locally preview production build:
-
-```bash
-pnpm preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
-
-## Renovate integration
-
-Install [Renovate GitHub app](https://github.com/apps/renovate/installations/select_target) on your repository and you are good to go.

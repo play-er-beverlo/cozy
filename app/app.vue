@@ -1,4 +1,13 @@
-<script setup>
+<script setup lang="ts">
+import logoLight from '~/assets/images/Play-ER.svg'
+import logoDark from '~/assets/images/Play-ER_Dark.svg'
+
+const user = useSupabaseUser()
+const client = useSupabaseClient()
+
+const title = 'Play-ER - Cozy Monday'
+const description = 'Wekelijkse snooker clubavond op maandag.'
+
 useHead({
   meta: [
     { name: 'viewport', content: 'width=device-width, initial-scale=1' }
@@ -7,71 +16,44 @@ useHead({
     { rel: 'icon', href: '/favicon.ico' }
   ],
   htmlAttrs: {
-    lang: 'en'
+    lang: 'nl'
   }
 })
-
-const title = 'Nuxt Starter Template'
-const description = 'A production-ready starter template powered by Nuxt UI. Build beautiful, accessible, and performant applications in minutes, not hours.'
 
 useSeoMeta({
   title,
   description,
   ogTitle: title,
   ogDescription: description,
-  ogImage: 'https://ui.nuxt.com/assets/templates/nuxt/starter-light.png',
   twitterCard: 'summary_large_image'
 })
+
+async function signOut() {
+  await client.auth.signOut()
+  await navigateTo('/')
+}
 </script>
 
 <template>
   <UApp>
-    <UHeader>
+    <UHeader :toggle="false">
       <template #left>
-        <NuxtLink to="/">
-          <AppLogo class="w-auto h-6 shrink-0" />
+        <NuxtLink to="/" class="flex items-center gap-3">
+          <img :src="logoLight" alt="Play-ER" class="h-8 w-auto dark:hidden">
+          <img :src="logoDark" alt="Play-ER" class="hidden h-8 w-auto dark:block">
+          <span class="text-lg font-semibold">Cozy Monday</span>
         </NuxtLink>
-
-        <TemplateMenu />
       </template>
 
       <template #right>
         <UColorModeButton />
-
-        <UButton
-          to="https://github.com/nuxt-ui-templates/starter"
-          target="_blank"
-          icon="i-simple-icons-github"
-          aria-label="GitHub"
-          color="neutral"
-          variant="ghost"
-        />
+        <UButton to="/admin" color="neutral" variant="ghost" label="Beheer" />
+        <UButton v-if="user" color="neutral" variant="outline" label="Afmelden" @click="signOut" />
       </template>
     </UHeader>
 
     <UMain>
       <NuxtPage />
     </UMain>
-
-    <USeparator icon="i-simple-icons-nuxtdotjs" />
-
-    <UFooter>
-      <template #left>
-        <p class="text-sm text-muted">
-          Built with Nuxt UI • © {{ new Date().getFullYear() }}
-        </p>
-      </template>
-
-      <template #right>
-        <UButton
-          to="https://github.com/nuxt-ui-templates/starter"
-          target="_blank"
-          icon="i-simple-icons-github"
-          aria-label="GitHub"
-          color="neutral"
-          variant="ghost"
-        />
-      </template>
-    </UFooter>
   </UApp>
 </template>

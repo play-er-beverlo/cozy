@@ -1,76 +1,167 @@
+<script setup lang="ts">
+type Player = {
+  id: string
+  name: string
+  rating: number
+}
+
+type TournamentRow = {
+  id: string
+  event_date: string
+  winner_player_id: string
+  loser_player_id: string
+  winner_rating_before: number
+  winner_rating_after: number
+  loser_rating_before: number
+  loser_rating_after: number
+}
+
+const client = useSupabaseClient()
+const sorting = ref([{ id: 'rating', desc: true }])
+
+const { data: playersData, pending: playersPending, error: playersError } = await useAsyncData('players', async () => {
+  const { data, error } = await client
+    .from('players')
+    .select('id,name,rating')
+
+  if (error) {
+    throw error
+  }
+  return data as Player[]
+})
+
+const { data: tournamentsData, pending: tournamentsPending, error: tournamentsError } = await useAsyncData('tournaments', async () => {
+  const { data, error } = await client
+    .from('tournaments')
+    .select('id,event_date,winner_player_id,loser_player_id,winner_rating_before,winner_rating_after,loser_rating_before,loser_rating_after')
+    .order('event_date', { ascending: false })
+
+  if (error) {
+    throw error
+  }
+  return data as TournamentRow[]
+})
+
+const players = computed(() => playersData.value ?? [])
+const tournaments = computed(() => tournamentsData.value ?? [])
+const playerMap = computed(() => new Map(players.value.map(player => [player.id, player.name])))
+const playerColumns = [
+  {
+    accessorKey: 'name',
+    header: 'Naam'
+  },
+  {
+    accessorKey: 'rating',
+    header: 'Niveau'
+  }
+]
+
+</script>
+
 <template>
-  <div>
-    <UPageHero
-      title="Nuxt Starter Template"
-      description="A production-ready starter template powered by Nuxt UI. Build beautiful, accessible, and performant applications in minutes, not hours."
-      :links="[{
-        label: 'Get started',
-        to: 'https://ui.nuxt.com/docs/getting-started/installation/nuxt',
-        target: '_blank',
-        trailingIcon: 'i-lucide-arrow-right',
-        size: 'xl'
-      }, {
-        label: 'Use this template',
-        to: 'https://github.com/nuxt-ui-templates/starter',
-        target: '_blank',
-        icon: 'i-simple-icons-github',
-        size: 'xl',
-        color: 'neutral',
-        variant: 'subtle'
-      }]"
-    />
+  <UContainer class="py-8 space-y-8">
+    <UCard>
+      <template #header>
+        <h2 class="text-lg font-semibold">
+          Spelers
+        </h2>
+      </template>
 
-    <UPageSection
-      id="features"
-      title="Everything you need to build modern Nuxt apps"
-      description="Start with a solid foundation. This template includes all the essentials for building production-ready applications with Nuxt UI's powerful component system."
-      :features="[{
-        icon: 'i-lucide-rocket',
-        title: 'Production-ready from day one',
-        description: 'Pre-configured with TypeScript, ESLint, Tailwind CSS, and all the best practices. Focus on building features, not setting up tooling.'
-      }, {
-        icon: 'i-lucide-palette',
-        title: 'Beautiful by default',
-        description: 'Leveraging Nuxt UI\'s design system with automatic dark mode, consistent spacing, and polished components that look great out of the box.'
-      }, {
-        icon: 'i-lucide-zap',
-        title: 'Lightning fast',
-        description: 'Optimized for performance with SSR/SSG support, automatic code splitting, and edge-ready deployment. Your users will love the speed.'
-      }, {
-        icon: 'i-lucide-blocks',
-        title: '100+ components included',
-        description: 'Access Nuxt UI\'s comprehensive component library. From forms to navigation, everything is accessible, responsive, and customizable.'
-      }, {
-        icon: 'i-lucide-code-2',
-        title: 'Developer experience first',
-        description: 'Auto-imports, hot module replacement, and TypeScript support. Write less boilerplate and ship more features.'
-      }, {
-        icon: 'i-lucide-shield-check',
-        title: 'Built for scale',
-        description: 'Enterprise-ready architecture with proper error handling, SEO optimization, and security best practices built-in.'
-      }]"
-    />
-
-    <UPageSection>
-      <UPageCTA
-        title="Ready to build your next Nuxt app?"
-        description="Join thousands of developers building with Nuxt and Nuxt UI. Get this template and start shipping today."
-        variant="subtle"
-        :links="[{
-          label: 'Start building',
-          to: 'https://ui.nuxt.com/docs/getting-started/installation/nuxt',
-          target: '_blank',
-          trailingIcon: 'i-lucide-arrow-right',
-          color: 'neutral'
-        }, {
-          label: 'View on GitHub',
-          to: 'https://github.com/nuxt-ui-templates/starter',
-          target: '_blank',
-          icon: 'i-simple-icons-github',
-          color: 'neutral',
-          variant: 'outline'
-        }]"
+      <div v-if="playersPending">
+        Spelers laden...
+      </div>
+      <div v-else-if="playersError">
+        Laden van spelers mislukt: {{ playersError.message }}
+      </div>
+      <UTable
+        v-else
+        v-model:sorting="sorting"
+        :data="players"
+        :columns="playerColumns"
+        empty="Geen spelers gevonden."
       />
-    </UPageSection>
-  </div>
+    </UCard>
+
+    <UCard>
+      <template #header>
+        <h2 class="text-lg font-semibold">
+          Tornooigeschiedenis
+        </h2>
+      </template>
+
+      <div class="text-sm text-muted">
+        <div v-if="tournamentsPending">
+          Tornooigeschiedenis laden...
+        </div>
+        <div v-else-if="tournamentsError">
+          Laden van tornooien mislukt: {{ tournamentsError.message }}
+        </div>
+        <div v-else-if="!tournaments.length">
+          Er zijn nog geen tornooiresultaten geregistreerd.
+        </div>
+        <div v-else class="overflow-auto">
+          <table class="w-full">
+            <thead>
+              <tr class="border-b">
+                <th class="text-left py-2">
+                  Datum
+                </th>
+                <th class="text-left py-2">
+                  Winnaar
+                </th>
+                <th class="text-left py-2">
+                  Verliezer
+                </th>
+                <!-- <th class="text-left py-2">
+                  Niveau winnaar
+                </th>
+                <th class="text-left py-2">
+                  Niveau verliezer
+                </th> -->
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in tournaments" :key="row.id" class="border-b last:border-b-0">
+                <td class="py-2">
+                  {{ row.event_date }}
+                </td>
+                <td class="py-2">
+                  {{ playerMap.get(row.winner_player_id) ?? 'Onbekend' }}
+                </td>
+                <td class="py-2">
+                  {{ playerMap.get(row.loser_player_id) ?? 'Onbekend' }}
+                </td>
+                <!-- <td class="py-2">
+                  {{ row.winner_rating_before }} -> {{ row.winner_rating_after }}
+                </td>
+                <td class="py-2">
+                  {{ row.loser_rating_before }} -> {{ row.loser_rating_after }}
+                </td> -->
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </UCard>
+
+    <UCard>
+      <template #header>
+        <h2 class="text-lg font-semibold">
+          Hoe werkt Cozy Monday?
+        </h2>
+      </template>
+
+      <div class="space-y-3 text-sm text-muted">
+        <p>
+          Tijdens Cozy Monday spelen we wekelijks een tornooi.
+        </p>
+        <ul class="list-disc pl-5 space-y-2">
+          <li>Elke speler heeft een niveau van 1 tot 10. Startniveau op basis van afdeling in competitie: Ere: 8, 1ste: 7, 2de: 6, 3de: 5, 4de: 4, 5de: 3</li>
+          <li>Bij een onderlinge wedstrijd krijgt de lager geplaatste speler 5 punten voorsprong per niveauverschil.</li>
+          <li>Na een tornooi, stijgt de winnaar en daalt de verliezer, met 1 niveaupunt.</li>
+          <li>Niveaus blijven altijd binnen de grenzen van 1 tot 10.</li>
+        </ul>
+      </div>
+    </UCard>
+  </UContainer>
 </template>
